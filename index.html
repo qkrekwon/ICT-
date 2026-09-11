@@ -18,6 +18,12 @@
     --blue-500:#5AA0E4;      /* 메인 (채도 UP) */
     --blue-600:#3E87D4;
     --blue-700:#2E6FB8;
+    --sky-50:#F3FBFF;
+    --sky-100:#DFF4FE;
+    --sky-200:#C2E9FB;
+    --sky-400:#93D9F4;
+    --sky-500:#66C6EA;
+    --sky-700:#2E9AC4;
     --mint:#C6EBD8;
     --mint-deep:#6FC49E;
     --peach:#FFD9C7;
@@ -201,9 +207,9 @@
 
   /* ===== FAB ===== */
   .chat-fab{position:fixed;right:22px;bottom:22px;z-index:80;width:68px;height:68px;border-radius:50%;border:none;
-    background:linear-gradient(135deg,var(--blue-500),var(--blue-700));color:#fff;font-size:1.7rem;cursor:pointer;
-    box-shadow:0 10px 26px rgba(46,111,184,.48);display:grid;place-items:center;transition:.18s;}
-  .chat-fab::before{content:"";position:absolute;inset:-6px;border-radius:50%;border:3px solid var(--blue-400);
+    background:linear-gradient(135deg,var(--sky-500),var(--sky-700));color:#fff;font-size:1.7rem;cursor:pointer;
+    box-shadow:0 10px 26px rgba(46,154,196,.42);display:grid;place-items:center;transition:.18s;}
+  .chat-fab::before{content:"";position:absolute;inset:-6px;border-radius:50%;border:3px solid var(--sky-400);
     animation:ring 2s ease-out infinite;}
   @keyframes ring{0%{transform:scale(.9);opacity:.9;}100%{transform:scale(1.35);opacity:0;}}
   .chat-fab:hover{transform:scale(1.08);}
@@ -222,7 +228,7 @@
     animation:up .3s cubic-bezier(.2,.8,.3,1);}
   @keyframes up{from{transform:translateY(40px);opacity:0;}to{transform:none;opacity:1;}}
   .chat-head{display:flex;align-items:center;gap:12px;padding:16px 18px;
-    background:linear-gradient(135deg,var(--blue-500) 0%,var(--blue-700) 100%);color:#fff;}
+    background:linear-gradient(135deg,var(--sky-500) 0%,var(--sky-700) 100%);color:#fff;}
   .chat-head .av{width:44px;height:44px;border-radius:16px;background:var(--mint);display:grid;place-items:center;font-size:1.3rem;
     box-shadow:0 4px 0 var(--mint-deep);}
   .chat-head h3{font-size:1rem;font-weight:900;}
@@ -230,11 +236,11 @@
   .chat-head .close{margin-left:auto;background:rgba(255,255,255,.22);border:none;color:#fff;width:34px;height:34px;
     border-radius:50%;cursor:pointer;font-size:1rem;}
   .token-bar{background:var(--sun);color:#6B4E00;font-size:.86rem;font-weight:900;padding:9px 18px;}
-  .chat-body{flex:1;overflow-y:auto;padding:16px;background:linear-gradient(180deg,var(--cream) 0%,var(--blue-50) 100%);
+  .chat-body{flex:1;overflow-y:auto;padding:16px;background:linear-gradient(180deg,var(--cream) 0%,var(--sky-50) 100%);
     display:flex;flex-direction:column;gap:10px;}
   .msg{max-width:84%;padding:12px 15px;border-radius:20px;font-size:.94rem;white-space:pre-wrap;line-height:1.6;font-weight:500;}
-  .bot{background:#fff;color:var(--ink);border-bottom-left-radius:7px;align-self:flex-start;
-    box-shadow:0 4px 12px rgba(58,106,158,.14);border:1.5px solid var(--blue-50);}
+  .bot{background:#FDFBFF;color:var(--ink);border-bottom-left-radius:7px;align-self:flex-start;
+    box-shadow:0 4px 12px rgba(46,154,196,.16);border:2px solid var(--sky-100);}
   .bot.child{background:#FFFBF0;border:2.5px solid #E8C98F;box-shadow:0 5px 0 rgba(232,201,143,.35),0 10px 22px rgba(58,106,158,.10);max-width:90%;}
   .bot.child .who{display:inline-flex;align-items:center;gap:5px;font-size:.75rem;font-weight:900;color:#8A5E14;
     background:linear-gradient(135deg,#FFE9B8,#FFD98A);padding:4px 12px;border-radius:999px;margin-bottom:8px;
@@ -243,21 +249,64 @@
   .bot.child .dis{margin-top:10px;padding-top:8px;border-top:1.5px dashed #E8C98F;font-size:.73rem;color:#A9884E;font-weight:700;line-height:1.45;}
   .sys{align-self:center;display:flex;align-items:center;gap:8px;font-size:.76rem;font-weight:900;color:#7A6242;
     background:rgba(255,255,255,.85);border:1.5px dashed #E8C98F;padding:5px 14px;border-radius:999px;margin:2px 0;}
-  .sys.back{color:#3E87D4;border-color:var(--blue-200);}
+  .sys.back{color:var(--sky-700);border-color:var(--sky-200);background:var(--sky-50);}
   .chat-head.child{background:linear-gradient(135deg,#F0B65E 0%,#D98E33 100%);}
   .chat-head.child .av{background:#FFF3D6;box-shadow:0 4px 0 #E0B970;}
   .chat-head .av{transition:.2s;}
-  .me{background:linear-gradient(135deg,var(--blue-500),var(--blue-700));color:#fff;border-bottom-right-radius:7px;align-self:flex-end;font-weight:600;}
-  .quick{display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 12px;background:var(--blue-50);}
-  .quick button{background:#fff;border:2px solid var(--blue-200);color:var(--blue-700);padding:9px 15px;border-radius:999px;
-    font-size:.87rem;font-weight:800;cursor:pointer;transition:.15s;box-shadow:0 3px 0 var(--blue-100);}
-  .quick button:hover{background:var(--blue-500);border-color:var(--blue-500);color:#fff;}
+
+  /* ===== 자식 에이전트별 테마 색상 (활동 카드 색과 동일) ===== */
+  /* 🌍 나라퀴즈 — 블루 */
+  .bot.child.a-nara{background:#F2F8FF;border-color:#8CBDEC;box-shadow:0 5px 0 rgba(140,189,236,.4),0 10px 22px rgba(58,106,158,.12);}
+  .bot.child.a-nara .who{color:#2E6FB8;background:linear-gradient(135deg,#DCEBFC,#BADAF6);border-color:#8CBDEC;}
+  .bot.child.a-nara .dis{border-top-color:#BADAF6;color:#5A87B5;}
+  .chat-head.child.a-nara{background:linear-gradient(135deg,#5AA0E4 0%,#2E6FB8 100%);}
+  .chat-head.child.a-nara .av{background:#DCEBFC;box-shadow:0 4px 0 #8CBDEC;}
+  .sys.a-nara{color:#2E6FB8;border-color:#8CBDEC;}
+
+  /* 🧸 사물퀴즈 — 크림베이지 */
+  .bot.child.a-samul{background:#FFFBF0;border-color:#E8C98F;box-shadow:0 5px 0 rgba(232,201,143,.4),0 10px 22px rgba(58,106,158,.10);}
+  .bot.child.a-samul .who{color:#8A5E14;background:linear-gradient(135deg,#FFE9B8,#FFD98A);border-color:#E8C98F;}
+  .bot.child.a-samul .dis{border-top-color:#E8C98F;color:#A9884E;}
+  .chat-head.child.a-samul{background:linear-gradient(135deg,#F0B65E 0%,#C79450 100%);}
+  .chat-head.child.a-samul .av{background:#FBEFDA;box-shadow:0 4px 0 #E0B970;}
+  .sys.a-samul{color:#8A5E14;border-color:#E8C98F;}
+
+  /* 👩‍🚒 직업체험 — 민트 */
+  .bot.child.a-jikup{background:#F1FBF6;border-color:#6FC49E;box-shadow:0 5px 0 rgba(111,196,158,.35),0 10px 22px rgba(58,106,158,.10);}
+  .bot.child.a-jikup .who{color:#2F7A57;background:linear-gradient(135deg,#DDF5E9,#C6EBD8);border-color:#6FC49E;}
+  .bot.child.a-jikup .dis{border-top-color:#C6EBD8;color:#5C9C7E;}
+  .chat-head.child.a-jikup{background:linear-gradient(135deg,#6FC49E 0%,#2F7A57 100%);}
+  .chat-head.child.a-jikup .av{background:#DDF5E9;box-shadow:0 4px 0 #4DA57F;}
+  .sys.a-jikup{color:#2F7A57;border-color:#6FC49E;}
+
+  /* 🎯 실제미션 — 피치 */
+  .bot.child.a-mission{background:#FFF6F1;border-color:#FF9E7A;box-shadow:0 5px 0 rgba(255,158,122,.32),0 10px 22px rgba(58,106,158,.10);}
+  .bot.child.a-mission .who{color:#C2552E;background:linear-gradient(135deg,#FFE7DC,#FFD9C7);border-color:#FF9E7A;}
+  .bot.child.a-mission .dis{border-top-color:#FFD9C7;color:#C98A6E;}
+  .chat-head.child.a-mission{background:linear-gradient(135deg,#FF9E7A 0%,#E5673B 100%);}
+  .chat-head.child.a-mission .av{background:#FFE7DC;box-shadow:0 4px 0 #E57B54;}
+  .sys.a-mission{color:#C2552E;border-color:#FF9E7A;}
+
+  /* 자식 연결 중에는 빠른답변 버튼도 같은 색으로 */
+  .quick.a-nara button{border-color:#8CBDEC;color:#2E6FB8;box-shadow:0 3px 0 #DCEBFC;}
+  .quick.a-nara button:hover{background:#5AA0E4;border-color:#5AA0E4;color:#fff;}
+  .quick.a-samul button{border-color:#E8C98F;color:#8A5E14;box-shadow:0 3px 0 #FBEFDA;}
+  .quick.a-samul button:hover{background:#E0A854;border-color:#E0A854;color:#fff;}
+  .quick.a-jikup button{border-color:#6FC49E;color:#2F7A57;box-shadow:0 3px 0 #DDF5E9;}
+  .quick.a-jikup button:hover{background:#4DA57F;border-color:#4DA57F;color:#fff;}
+  .quick.a-mission button{border-color:#FF9E7A;color:#C2552E;box-shadow:0 3px 0 #FFE7DC;}
+  .quick.a-mission button:hover{background:#F07C51;border-color:#F07C51;color:#fff;}
+  .me{background:linear-gradient(135deg,var(--sky-500),var(--sky-700));color:#fff;border-bottom-right-radius:7px;align-self:flex-end;font-weight:600;}
+  .quick{display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 12px;background:var(--sky-50);}
+  .quick button{background:#fff;border:2px solid var(--sky-200);color:var(--sky-700);padding:9px 15px;border-radius:999px;
+    font-size:.87rem;font-weight:800;cursor:pointer;transition:.15s;box-shadow:0 3px 0 var(--sky-100);}
+  .quick button:hover{background:var(--sky-500);border-color:var(--sky-500);color:#fff;}
   .chat-input{display:flex;gap:8px;padding:12px;border-top:2px solid var(--cream-line);background:var(--cream);}
   .chat-input input{flex:1;border:2px solid var(--cream-line);background:#fff;border-radius:999px;padding:13px 17px;
     font-size:.94rem;outline:none;font-family:inherit;}
-  .chat-input input:focus{border-color:var(--blue-400);}
-  .chat-input button{background:var(--blue-600);border:none;color:#fff;width:48px;border-radius:50%;cursor:pointer;font-size:1.05rem;
-    box-shadow:0 4px 0 var(--blue-700);}
+  .chat-input input:focus{border-color:var(--sky-400);}
+  .chat-input button{background:var(--sky-500);border:none;color:#fff;width:48px;border-radius:50%;cursor:pointer;font-size:1.05rem;
+    box-shadow:0 4px 0 var(--sky-700);}
 
   @media(max-width:900px){
     .grid{grid-template-columns:repeat(2,1fr);}
@@ -715,6 +764,9 @@ const UNIT = {"나라퀴즈":"문제","사물퀴즈":"문제","직업체험":"�
 const MAXN = {"나라퀴즈":12,"사물퀴즈":8,"직업체험":4,"실제미션":10};
 const NUM  = ["1️⃣","2️⃣","3️⃣","4️⃣"];
 const AGENT_EMO = { "나라퀴즈":"🌍", "사물퀴즈":"🧸", "직업체험":"👩\u200d🚒", "실제미션":"🎯" };
+const AGENT_CLS = { "나라퀴즈":"a-nara", "사물퀴즈":"a-samul", "직업체험":"a-jikup", "실제미션":"a-mission" };
+const ALL_CLS = ["a-nara","a-samul","a-jikup","a-mission"];
+function curCls(){ return (CUR_AGENT && AGENT_CLS[CUR_AGENT]) ? AGENT_CLS[CUR_AGENT] : ""; }
 
 let S = { step:"age", age:null, nick:null, tokens:100, pending:null, started:false, run:null };
 let CUR_AGENT = null;
@@ -727,7 +779,7 @@ function clean(t){ return String(t).split('**').join(''); }
 function bot(t, child){ if(child){ addChild(t); } else { add(t, 'bot'); } }
 function addChild(text){
   const d = document.createElement('div');
-  d.className = 'msg bot child';
+  d.className = ('msg bot child ' + curCls()).trim();
   const w = document.createElement('div');
   w.className = 'who';
   w.textContent = (AGENT_EMO[CUR_AGENT] || '🍀') + ' ' + (CUR_AGENT ? CUR_AGENT + ' 에이전트' : '자식 에이전트');
@@ -751,7 +803,7 @@ function add(text, cls){
 }
 function sys(text, back){
   const d = document.createElement('div');
-  d.className = back ? 'sys back' : 'sys';
+  d.className = (back ? 'sys back' : ('sys ' + curCls()).trim());
   d.textContent = text;
   bodyEl.appendChild(d);
   bodyEl.scrollTop = bodyEl.scrollHeight;
@@ -783,7 +835,14 @@ function setAgentName(name){
     : "온라인 · 바로 답변해요";
   document.getElementById('agentAv').textContent = CUR_AGENT ? AGENT_EMO[CUR_AGENT] : "🍀";
   const head = document.getElementById('chatHead');
-  if(CUR_AGENT){ head.classList.add('child'); } else { head.classList.remove('child'); }
+  for(var ci=0; ci<ALL_CLS.length; ci++){ head.classList.remove(ALL_CLS[ci]); quickEl.classList.remove(ALL_CLS[ci]); }
+  if(CUR_AGENT){
+    head.classList.add('child');
+    head.classList.add(AGENT_CLS[CUR_AGENT]);
+    quickEl.classList.add(AGENT_CLS[CUR_AGENT]);
+  } else {
+    head.classList.remove('child');
+  }
 }
 function openChat(){
   document.getElementById('overlay').classList.add('open');
