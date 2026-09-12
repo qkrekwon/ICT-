@@ -1330,8 +1330,11 @@ function __ppHosts(envId){
   var g = String(envId).replace(/^Default-/i, "").replace(/-/g, "").toLowerCase();
   var out = [];
   if (g.length === 32) {
-    out.push("https://" + g.slice(0, 30) + "." + g.slice(30) + ".environment.api.powerplatform.com");
-    out.push("https://" + g.slice(0, 31) + "." + g.slice(31) + ".environment.api.powerplatform.com");
+    /* Power Platform 환경 API 호스트: GUID(32자)를 앞 30자 + "." + 뒤 2자 로 나눕니다.
+       테넌트/리전에 따라 분할 위치가 다를 수 있어 후보를 모두 시도합니다. */
+    [30, 31, 29, 28].forEach(function(i){
+      out.push("https://" + g.slice(0, i) + "." + g.slice(i) + ".environment.api.powerplatform.com");
+    });
   }
   return out;
 }
@@ -1340,6 +1343,19 @@ window.AGENT_CFG = {
   host: __ppHosts("Default-a5a060c4-00b2-4343-b6c9-23625439a0c0")[0],
   hostCandidates: __ppHosts("Default-a5a060c4-00b2-4343-b6c9-23625439a0c0"),
   directLineBase: "https://directline.botframework.com/v3/directline",
+
+  /* ▼▼▼ [중요] Copilot Studio → 채널 → 모바일 앱 → "토큰 엔드포인트" 를 그대로 붙여넣으세요.
+     (?api-version=... 까지 전부 포함. 붙여넣으면 호스트 자동추정보다 우선 사용됩니다.)
+     예) "https://xxxxxxxx.xx.environment.api.powerplatform.com/powervirtualagents/botsbyschema/cr9fa_bot_3mXvDR/directline/token?api-version=2022-03-01"
+     비워두면(빈 문자열) 환경 ID로 호스트를 자동 추정합니다. */
+  tokenEndpoints: {
+    "부모":     "",
+    "나라퀴즈": "",
+    "사물퀴즈": "",
+    "직업체험": "",
+    "실제미션": ""
+  },
+  /* ▲▲▲ */
   userId: "web_" + Math.random().toString(36).slice(2, 10),
   userName: "웹사용자",
   // 부모 + 자식 4개 스키마 이름
@@ -1367,19 +1383,26 @@ window.AGENT_CFG = {
   /* [FIX] 호스트 후보를 순서대로 시도하고, 성공한 호스트를 고정합니다. */
   var HOST_OK = null;
   function fetchToken(schema, key){
-    var cands = HOST_OK ? [HOST_OK] : (CFG.hostCandidates || [CFG.host]);
+    /* 1순위: 사용자가 붙여넣은 공식 토큰 엔드포인트, 2순위: 자동 추정 호스트 */
+    var manual = (CFG.tokenEndpoints && CFG.tokenEndpoints[key] || '').trim();
+    var urls = [];
+    if (manual) urls.push(manual);
+    (HOST_OK ? [HOST_OK] : (CFG.hostCandidates || [CFG.host])).forEach(function(h){
+      urls.push(tokenUrl(schema, h));
+    });
+    var cands = urls;
     var idx = 0, errs = [];
     function attempt(){
       if (idx >= cands.length) {
         return Promise.reject(new Error(key + ' 토큰 실패 -> ' + errs.join(' | ')));
       }
       var host = cands[idx++];
-      return fetch(tokenUrl(schema, host))
+      return fetch(host)
         .then(function(r){
           if (!r.ok) { errs.push(host + ' HTTP ' + r.status); return attempt(); }
           return r.json().then(function(j){
             if (!j || !j.token) { errs.push(host + ' token-missing'); return attempt(); }
-            HOST_OK = host; CFG.host = host;
+            HOST_OK = host.split('/powervirtualagents/')[0]; CFG.host = HOST_OK;
             if (window.console) console.info('[agent] token OK host:', host);
             return j;
           });
@@ -1392,7 +1415,15 @@ window.AGENT_CFG = {
     }
     return attempt();
   }
+  /* [FIX] /canvas (데모 웹사이트)는 Content-Security-Policy: frame-ancestors 'self' 때문에
+     외부 사이트(github.io)에서 iframe 으로 열 수 없습니다.
+     반드시 "사용자 지정 웹 사이트" 채널용 /webchat URL 을 사용해야 임베드됩니다. */
   function embedUrl(schema){
+    return 'https://copilotstudio.microsoft.com/environments/' + CFG.environmentId +
+           '/bots/' + schema + '/webchat?__version__=2';
+  }
+  /* 새 창으로 열 때(임베드가 막힌 경우 대비)는 데모 웹사이트 URL 사용 */
+  function popupUrl(schema){
     return 'https://copilotstudio.microsoft.com/environments/' + CFG.environmentId +
            '/bots/' + schema + '/canvas?__version__=2&enableFileAttachment=false&cliAgent=true';
   }
@@ -1731,7 +1762,14 @@ window.AGENT_CFG = {
   };
 
   window.__agentDebug = {
-    conns: CONNS, conn: conn, tokenUrl: tokenUrl, embedUrl: embedUrl,
+    conns: CONNS, conn: conn, tokenUrl: tokenUrl, embedUrl: embedUrl, popupUrl: popupUrl,
+    hosts: (CFG.hostCandidates || []),
+    testToken: function(key){
+      var k = key || '부모';
+      return fetchToken(CFG.schemas[k], k)
+        .then(function(j){ console.info('[agent] OK', k, j.token.slice(0,12) + '...'); return j; })
+        .catch(function(e){ console.error('[agent] FAIL', k, e.message); throw e; });
+    },
     goChild: goChild, returnToParent: returnToParent,
     state: function(){ return { active: ACTIVE, pending: pending, nick: S.nick, age: S.age, tokens: S.tokens }; },
     showFor: showFor, buildQuick: buildQuick, tidy: tidy
@@ -1748,7 +1786,17 @@ window.AGENT_CFG = {
     el = document.createElement('div');
     el.id = 'childFrame';
     el.style.cssText = 'flex:1;display:none;';
-    el.innerHTML = '<iframe id="childIfr" style="width:100%;height:100%;border:0;" allow="microphone; clipboard-write"></iframe>';
+    el.style.cssText += 'position:relative;';
+    el.innerHTML =
+      '<iframe id="childIfr" style="width:100%;height:100%;border:0;" ' +
+      'allow="microphone; clipboard-write" ' +
+      'sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"></iframe>' +
+      '<div id="childFallback" style="display:none;position:absolute;left:0;right:0;bottom:0;' +
+      'background:#fff8e1;border-top:2px solid #ffd54f;padding:10px 12px;font-size:.85rem;' +
+      'color:#6B4E00;font-weight:700;text-align:center;">' +
+      '창이 비어 있나요? <button id="childPopup" style="margin-left:6px;border:0;border-radius:8px;' +
+      'padding:6px 12px;background:#2F7A57;color:#fff;font-weight:800;cursor:pointer;font-family:inherit;">' +
+      '새 창에서 열기</button></div>';
     var chat = document.querySelector('.chat');
     if(chat) chat.appendChild(el);
     return el;
@@ -1760,6 +1808,15 @@ window.AGENT_CFG = {
     var el = childFrameEl();
     var ifr = document.getElementById('childIfr');
     if(ifr) ifr.src = embedUrl(schema);
+    /* 임베드가 CSP 로 차단되면 화면이 비므로, 6초 뒤 새 창 안내를 띄웁니다. */
+    var fb = document.getElementById('childFallback');
+    var pop = document.getElementById('childPopup');
+    if(pop) pop.onclick = function(){ window.open(popupUrl(schema), '_blank', 'noopener'); };
+    if(fb){
+      fb.style.display = 'none';
+      clearTimeout(window.__childFbTimer);
+      window.__childFbTimer = setTimeout(function(){ fb.style.display = 'block'; }, 6000);
+    }
     el.style.display = 'block';
     ['body','quick'].forEach(function(id){ var e=document.getElementById(id); if(e) e.style.display='none'; });
     var form = document.querySelector('.chat-input'); if(form) form.style.display = 'none';
@@ -1773,6 +1830,8 @@ window.AGENT_CFG = {
     var el = document.getElementById('childFrame');
     if(el) el.style.display = 'none';
     var ifr = document.getElementById('childIfr'); if(ifr) ifr.src = 'about:blank';
+    clearTimeout(window.__childFbTimer);
+    var fb0 = document.getElementById('childFallback'); if(fb0) fb0.style.display = 'none';
     ['body','quick'].forEach(function(id){ var e=document.getElementById(id); if(e) e.style.display=''; });
     var form = document.querySelector('.chat-input'); if(form) form.style.display = '';
     backBtn.classList.remove('on');
