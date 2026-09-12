@@ -1810,6 +1810,7 @@ window.AGENT_CFG = {
       S.step = 'menu';
       setTimeout(function(){
         sys('🔗 ' + (AGENT_EMO[act]||'') + ' ' + act + ' 에이전트에 연결했어요!');
+        sys('ℹ️ 현재 대체 모드 — 부모 안내는 페이지가, 활동은 실제 에이전트가 진행합니다. 우측 배지를 누르면 진단을 볼 수 있어요.');
         bot('아래 창에서 ' + act + ' 에이전트와 바로 대화하세요 😊\n' +
             '"' + (S.nick||'친구') + ', ' + (S.age||'') + ', ' + count + unit + ' 시작해주세요" 라고 입력하면 돼요.\n' +
             '끝나면 위의 ↩︎ 돌아가기 를 눌러주세요.', false);
@@ -1841,6 +1842,207 @@ window.AGENT_CFG = {
 
   window.__agentHybrid = { enter: enterHybrid, openChildFrame: openChildFrame,
                            closeChildFrame: closeChildFrame, isHybrid: function(){ return HYBRID; } };
+
+
+  /* =====================================================================
+     [v2 FIX] 연결 진단 패널 — 실패 원인을 화면에 그대로 보여줍니다.
+     ===================================================================== */
+  var DIAG = { rows: [], reason: null };
+
+  function diagPanel(){
+    var el = document.getElementById('diagPanel');
+    if (el) return el;
+    el = document.createElement('div');
+    el.id = 'diagPanel';
+    el.style.cssText = 'position:fixed;right:12px;bottom:12px;z-index:100000;width:min(520px,94vw);' +
+      'max-height:70vh;overflow:auto;background:#11181f;color:#e6edf3;border-radius:12px;' +
+      'box-shadow:0 10px 40px rgba(0,0,0,.45);font:12.5px/1.6 ui-monospace,Consolas,monospace;' +
+      'padding:14px 16px;display:none;';
+    document.body.appendChild(el);
+    return el;
+  }
+
+  function renderDiag(){
+    var el = diagPanel();
+    var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
+      '<b style="font-size:14px">\u{1F50E} \uC5F0\uACB0 \uC9C4\uB2E8</b>' +
+      '<button id="diagClose" style="background:#30363d;color:#e6edf3;border:0;border-radius:6px;' +
+      'padding:4px 10px;cursor:pointer">\uB2EB\uAE30</button></div>';
+    html += '<div style="color:#8b949e;margin-bottom:8px">\uBAA8\uB4DC: <b style="color:' +
+      (HYBRID ? '#f0a020' : '#3fb950') + '">' +
+      (HYBRID ? '\u{1F7E1} HYBRID(\uB300\uCCB4) \u2014 \uBD80\uBAA8\uB294 \uD398\uC774\uC9C0 JS\uAC00 \uC751\uB2F5' :
+                '\u{1F7E2} LIVE \u2014 Direct Line \uC5F0\uACB0\uB428') + '</b></div>';
+    if (DIAG.reason) {
+      html += '<div style="background:#3d1d1d;border-left:3px solid #f85149;padding:8px 10px;' +
+        'border-radius:6px;margin-bottom:10px;white-space:pre-wrap;word-break:break-all">' +
+        '\u26A0\uFE0F ' + String(DIAG.reason).replace(/</g,'&lt;') + '</div>';
+    }
+    html += '<table style="width:100%;border-collapse:collapse">' +
+      '<tr style="color:#8b949e;text-align:left"><th>\uC5D0\uC774\uC804\uD2B8</th><th>\uBD07 ID</th><th>\uACB0\uACFC</th></tr>';
+    DIAG.rows.forEach(function(r){
+      var color = r.ok ? '#3fb950' : '#f85149';
+      html += '<tr style="border-top:1px solid #21262d">' +
+        '<td style="padding:4px 6px 4px 0">' + r.key + '</td>' +
+        '<td style="padding:4px 6px 4px 0;color:#8b949e">' + r.schema + '</td>' +
+        '<td style="padding:4px 0;color:' + color + ';word-break:break-all">' +
+        (r.ok ? '\u2705 OK' : '\u274C ' + String(r.msg).replace(/</g,'&lt;')) + '</td></tr>';
+    });
+    html += '</table>';
+    html += '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">' +
+      '<button id="diagRetry" style="background:#238636;color:#fff;border:0;border-radius:6px;' +
+      'padding:7px 12px;cursor:pointer">\u{1F504} \uB2E4\uC2DC \uC9C4\uB2E8</button>' +
+      '<button id="diagParent" style="background:#1f6feb;color:#fff;border:0;border-radius:6px;' +
+      'padding:7px 12px;cursor:pointer">\u{1F517} \uC9C4\uC9DC \uBD80\uBAA8 \uC5D0\uC774\uC804\uD2B8 \uC5F4\uAE30</button>' +
+      '<button id="diagCopy" style="background:#30363d;color:#e6edf3;border:0;border-radius:6px;' +
+      'padding:7px 12px;cursor:pointer">\u{1F4CB} \uACB0\uACFC \uBCF5\uC0AC</button></div>';
+    html += '<div style="margin-top:10px;color:#8b949e">host: ' + (CFG.host||'') + '</div>';
+    el.innerHTML = html;
+    el.style.display = 'block';
+    document.getElementById('diagClose').onclick = function(){ el.style.display='none'; };
+    document.getElementById('diagRetry').onclick = function(){ runDiag(); };
+    document.getElementById('diagParent').onclick = function(){ openParentFrame(); el.style.display='none'; };
+    document.getElementById('diagCopy').onclick = function(){
+      var t = 'mode=' + (HYBRID?'HYBRID':'LIVE') + '\nreason=' + DIAG.reason + '\nhost=' + CFG.host + '\n' +
+        DIAG.rows.map(function(r){ return r.key + ' (' + r.schema + '): ' + (r.ok?'OK':r.msg); }).join('\n');
+      try { navigator.clipboard.writeText(t); this.textContent = '\u2705 \uBCF5\uC0AC\uB428'; } catch(e){}
+    };
+  }
+
+  /* 5개 봇 토큰 엔드포인트를 실제로 두드려 원인 수집 */
+  function runDiag(){
+    DIAG.rows = [];
+    var keys = Object.keys(CFG.schemas);
+    var cands = CFG.hostCandidates || [CFG.host];
+    var done = 0;
+    keys.forEach(function(key){
+      var schema = CFG.schemas[key];
+      var idx = 0, errs = [];
+      function attempt(){
+        if (idx >= cands.length) {
+          DIAG.rows.push({ key:key, schema:schema, ok:false, msg:errs.join(' | ') });
+          if (++done === keys.length) renderDiag();
+          return;
+        }
+        var host = cands[idx++];
+        var short = host.replace('https://','').split('.')[0].slice(0,10) + '\u2026';
+        fetch(tokenUrl(schema, host))
+          .then(function(r){
+            if (!r.ok) {
+              errs.push('HTTP ' + r.status + (r.status===401||r.status===403 ?
+                ' (\uBD07 \uBCF4\uC548=\uC778\uC99D\uC5C6\uC74C \uD655\uC778)' :
+                r.status===404 ? ' (\uBD07 ID/\uAC8C\uC2DC \uD655\uC778)' : ''));
+              return attempt();
+            }
+            return r.json().then(function(j){
+              if (!j || !j.token) { errs.push('\uD1A0\uD070 \uC5C6\uC74C'); return attempt(); }
+              DIAG.rows.push({ key:key, schema:schema, ok:true, msg:'token' });
+              CFG.host = host;
+              if (++done === keys.length) renderDiag();
+            });
+          })
+          .catch(function(e){
+            var m = (e && e.message) || 'fetch \uC2E4\uD328';
+            if (/Failed to fetch/i.test(m)) m += ' (CORS \uB610\uB294 DNS/\uB124\uD2B8\uC6CC\uD06C \uCC28\uB2E8)';
+            errs.push(short + ' ' + m);
+            return attempt();
+          });
+      }
+      attempt();
+    });
+    if (!keys.length) renderDiag();
+  }
+
+  /* 배지 클릭 = 진단 열기 */
+  badge.style.cursor = 'pointer';
+  badge.title = '\uD074\uB9AD\uD558\uBA74 \uC5F0\uACB0 \uC9C4\uB2E8\uC744 \uBCF4\uC5EC\uC90D\uB2C8\uB2E4';
+  badge.onclick = function(){ runDiag(); };
+
+  /* [v2 FIX] 부모 에이전트를 iframe(공식 캔버스)으로 직접 열기 */
+  function openParentFrame(){
+    var el = childFrameEl();
+    var ifr = document.getElementById('childIfr');
+    if (ifr) ifr.src = embedUrl(CFG.schemas['\uBD80\uBAA8']);
+    el.style.display = 'block';
+    ['body','quick'].forEach(function(id){ var e=document.getElementById(id); if(e) e.style.display='none'; });
+    var form = document.querySelector('.chat-input'); if(form) form.style.display = 'none';
+    setAgentName('\uBD80\uBAA8 \uC5D0\uC774\uC804\uD2B8(\uACF5\uC2DD \uCE94\uBC84\uC2A4)');
+    backBtn.classList.add('on');
+    return true;
+  }
+  window.__openParentFrame = openParentFrame;
+
+  /* [v2 FIX] HYBRID 진입 시 사유를 저장하고, 진단 버튼을 항상 보이게 */
+  var _enterHybrid = enterHybrid;
+  enterHybrid = function(reason){
+    DIAG.reason = reason;
+    _enterHybrid(reason);
+    setTimeout(function(){
+      badge.style.display = '';
+      setBadge('\u{1F7E1} \uB300\uCCB4\uBAA8\uB4DC \u2014 \uD074\uB9AD\uD574 \uC9C4\uB2E8', 'wait');
+      badge.onclick = function(){ runDiag(); };
+    }, 3200);
+  };
+
+  /* =====================================================================
+     [v2 FIX] 로컬 부모 응답 개선 — "같은 문구 반복" 해결
+     ===================================================================== */
+  var LAST_MSG = '';
+  var NO_REPLIES = [
+    '\uAD1C\uCC2E\uC544\uC694! \uCC9C\uCC9C\uD788 \uACE0\uB974\uC168\uB3C4 \uB3FC\uC694 \u{1F60A} \uC27C\uACE0 \uC2F6\uC73C\uBA74 \uC27C\uC5B4\uB3C4 \uC88B\uC544\uC694.',
+    '\uC54C\uACA0\uC5B4\uC694! \uC9C0\uAE08\uC740 \uC26C\uC5B4\uAC00\uC694. \uD1A0\uD070\uC740 \uADF8\uB300\uB85C \uB0A8\uC544\uC788\uC73C\uB2C8 \uC5B8\uC81C\uB4E0 \uB3CC\uC544\uC624\uC138\uC694 \u{1F340}',
+    '\uC804\uD600 \uBD80\uB2F4 \uAC00\uC9C0\uC9C0 \uB9C8\uC138\uC694! \uD558\uACE0 \uC2F6\uC5B4\uC9C0\uBA74 \uADF8\uB54C \uB9D0\uC500\uD574\uC8FC\uC138\uC694 \u{1F917}'
+  ];
+  var noIdx = 0;
+
+  function localSpecial(text){
+    if (typeof S === 'undefined' || S.run) return false;
+    if (S.step !== 'menu') return false;
+    var s = (text || '').replace(/\s/g, '');
+    if (typeof detectActivity === 'function' && detectActivity(s)) return false;
+
+    /* 거절 / 보류 */
+    if (/^(\uC544\uB2C8|\uC544\uB2C8\uC694|\uC2EB\uC5B4|\uC2EB\uC5B4\uC694|\uC548\uD574|\uC548\uD560\uB798|\uC548\uD560\uAC70\uC57C|\uC548\uD558\uACE0\uC2F6\uC5B4|\uD558\uAE30\uC2EB\uC5B4|\uADF8\uB9CC|\uADF8\uB9CC\uD560\uB798|\uB098\uC911\uC5D0|\uD328\uC2A4|\uC26C\uACE0\uC2F6\uC5B4|\uC26C\uC744\uB798|\uC5C6\uC5B4|\uBABB\uD558\uACA0|\uAD1C\uCC2E\uC544)/.test(s)) {
+      var m = NO_REPLIES[noIdx++ % NO_REPLIES.length];
+      bot((S.nick ? S.nick + '\uB2D8! ' : '') + m, false);
+      quick(['\uB2E4\uC2DC \uACE0\uB97C\uB798\uC694', '\uD1A0\uD070 \uD655\uC778']);
+      return true;
+    }
+    /* 토큰 문의 */
+    if (/\uD1A0\uD070|\uB0A8\uC740|\uC5BC\uB9C8/.test(s)) {
+      bot((S.nick ? S.nick + '\uB2D8\uC758 ' : '') + '\uD604\uC7AC \uBCF4\uC720 \uD1A0\uD070\uC740 ' + S.tokens +
+          '\uD1A0\uD070\uC774\uC5D0\uC694 \u{1FA99}\n\uB098\uB77C\uD034\uC988/\uC0AC\uBB3C\uD034\uC988/\uC9C1\uC5C5\uCCB4\uD5D8 1\uAC1C=10\uD1A0\uD070, \uC2E4\uC81C\uBBF8\uC158 1\uAC1C=2\uD1A0\uD070\uC785\uB2C8\uB2E4.', false);
+      return true;
+    }
+    /* 도움말 / 추천 요청 */
+    if (/\uB3C4\uC6C0|\uBAA8\uB974|\uBB50\uD574|\uBB34\uC5C7|\uCD94\uCC9C|\uACE8\uB77C\uC918|\uC54C\uC544\uC11C/.test(s)) {
+      if (typeof showReco === 'function') {
+        bot((S.nick ? S.nick + '\uB2D8\uC5D0\uAC8C ' : '') + '\uB531 \uB9DE\uB294 \uC21C\uC11C\uB85C \uCD94\uCC9C\uD574\uB4DC\uB9B4\uAC8C\uC694! \u2728', false);
+        showReco(true);
+        return true;
+      }
+    }
+    /* 진단 요청 */
+    if (/\uC9C4\uB2E8|\uC5F0\uACB0\uD655\uC778|\uB514\uBC84\uADF8/.test(s)) {
+      bot('\uC5F0\uACB0 \uC9C4\uB2E8\uC744 \uC5F4\uC5B4\uB4DC\uB9B4\uAC8C\uC694! \u{1F50E}', false);
+      runDiag();
+      return true;
+    }
+    return false;
+  }
+
+  /* ORIG.reply 를 감싸서 특수 응답 우선 처리 */
+  var _origReplyFn = ORIG.reply;
+  if (typeof _origReplyFn === 'function') {
+    ORIG.reply = function(text){
+      try { if (localSpecial(text)) return; } catch(e){}
+      return _origReplyFn.apply(this, arguments);
+    };
+  }
+
+  /* URL 에 ?debug=1 이면 로드 직후 진단 자동 실행 */
+  if (/[?&]debug=1/.test(location.search)) {
+    setTimeout(function(){ runDiag(); }, 1500);
+  }
 
   setBadge('🔗 연결 준비됨');
 })();
