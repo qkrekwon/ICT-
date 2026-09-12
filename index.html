@@ -1326,16 +1326,24 @@ function pickFromCard(name){
 /* [FIX] 환경 ID에서 Power Platform API 호스트를 자동 산출합니다.
    규칙: GUID(하이픈 제거, 32자) -> 앞 30자 + "." + 뒤 2자
    기존 파일은 "...a0c" + "." + "0" 으로 한 칸 밀려 ERR_NAME_NOT_RESOLVED 발생 */
+/* Power Platform 환경 API 호스트 계산
+   [확인됨] 환경 ID 가 "Default-xxxx" 형태면 "default" 접두사를 그대로 유지해야 합니다.
+   실제 호스트: default + GUID(하이픈제거 32자) 를 이어붙인 뒤, 뒤에서 2자 앞에 점을 찍음
+   예) Default-a5a060c4-00b2-4343-b6c9-23625439a0c0
+     → defaulta5a060c400b24343b6c923625439a0 . c0 .environment.api.powerplatform.com  ✅
+   (이전 버전은 "default" 를 제거해서 ERR_NAME_NOT_RESOLVED 가 났습니다) */
 function __ppHosts(envId){
-  var g = String(envId).replace(/^Default-/i, "").replace(/-/g, "").toLowerCase();
+  var raw = String(envId).replace(/-/g, "").toLowerCase();   // "defaulta5a0...a0c0"
+  var bare = String(envId).replace(/^Default-/i, "").replace(/-/g, "").toLowerCase();
   var out = [];
-  if (g.length === 32) {
-    /* Power Platform 환경 API 호스트: GUID(32자)를 앞 30자 + "." + 뒤 2자 로 나눕니다.
-       테넌트/리전에 따라 분할 위치가 다를 수 있어 후보를 모두 시도합니다. */
-    [30, 31, 29, 28].forEach(function(i){
-      out.push("https://" + g.slice(0, i) + "." + g.slice(i) + ".environment.api.powerplatform.com");
-    });
+  function add(s){
+    if (s.length < 4) return;
+    var u = "https://" + s.slice(0, s.length - 2) + "." + s.slice(s.length - 2) +
+            ".environment.api.powerplatform.com";
+    if (out.indexOf(u) === -1) out.push(u);
   }
+  add(raw);    // ✅ 1순위: default 접두사 포함 (실제 동작하는 형태)
+  add(bare);   //    2순위: 접두사 없는 형태 (일부 환경)
   return out;
 }
 window.AGENT_CFG = {
@@ -1344,18 +1352,17 @@ window.AGENT_CFG = {
   hostCandidates: __ppHosts("Default-a5a060c4-00b2-4343-b6c9-23625439a0c0"),
   directLineBase: "https://directline.botframework.com/v3/directline",
 
-  /* ▼▼▼ [중요] Copilot Studio → 채널 → 모바일 앱 → "토큰 엔드포인트" 를 그대로 붙여넣으세요.
-     (?api-version=... 까지 전부 포함. 붙여넣으면 호스트 자동추정보다 우선 사용됩니다.)
-     예) "https://xxxxxxxx.xx.environment.api.powerplatform.com/powervirtualagents/botsbyschema/cr9fa_bot_3mXvDR/directline/token?api-version=2022-03-01"
-     비워두면(빈 문자열) 환경 ID로 호스트를 자동 추정합니다. */
-  tokenEndpoints: {
-    "부모":     "",
-    "나라퀴즈": "",
-    "사물퀴즈": "",
-    "직업체험": "",
-    "실제미션": ""
-  },
-  /* ▲▲▲ */
+  /* ▼▼▼▼▼▼▼▼▼▼ 여기 딱 한 줄만 채우면 됩니다 ▼▼▼▼▼▼▼▼▼▼
+     Copilot Studio → (아무 에이전트나 1개) → 채널 → 모바일 앱 → "토큰 엔드포인트" 복사해서
+     아래 따옴표 안에 그대로 붙여넣으세요. ?api-version=... 까지 전부 포함.
+
+     예시)
+     tokenEndpoint: "https://abcd1234.5e.environment.api.powerplatform.com/powervirtualagents/botsbyschema/cr9fa_bot_3mXvDR/directline/token?api-version=2022-03-01",
+
+     ★ 하나만 넣으면 나머지 4개 에이전트는 자동으로 처리됩니다.
+       (같은 환경이라 주소에서 봇 이름만 바뀌기 때문) */
+  tokenEndpoint: "",
+  /* ▲▲▲▲▲▲▲▲▲▲ 여기까지 ▲▲▲▲▲▲▲▲▲▲ */
   userId: "web_" + Math.random().toString(36).slice(2, 10),
   userName: "웹사용자",
   // 부모 + 자식 4개 스키마 이름
@@ -1376,19 +1383,43 @@ window.AGENT_CFG = {
                startActivity: window.startActivity, openActivity: window.openActivity };
   var HYBRID = false;
 
+  /* 인증 "없음" 에이전트용 Direct Line 토큰 경로.
+     주의: /copilotstudio/dataverse-backed/authenticated/... 경로는 Entra 로그인이 필요하므로
+           인증 없음 설정에서는 사용하지 않습니다. 호스트만 동일하게 씁니다. */
+  var TOKEN_PATHS = [
+    function(s){ return '/powervirtualagents/botsbyschema/' + s + '/directline/token?api-version=2022-03-01'; },
+    function(s){ return '/copilotstudio/dataverse-backed/authenticated/bots/' + s + '/directline/token?api-version=2022-03-01-preview'; }
+  ];
   function tokenUrl(schema, host){
-    return (host || CFG.host) + '/powervirtualagents/botsbyschema/' + schema +
-           '/directline/token?api-version=2022-03-01';
+    return (host || CFG.host) + TOKEN_PATHS[0](schema);
   }
   /* [FIX] 호스트 후보를 순서대로 시도하고, 성공한 호스트를 고정합니다. */
   var HOST_OK = null;
+  /* 붙여넣은 엔드포인트에서 호스트만 뽑아, 모든 에이전트에 재사용합니다. */
+  /* 콘솔/localStorage 로 넣은 값이 있으면 그걸 우선 사용 (파일 수정 없이 테스트용) */
+  try {
+    var saved = localStorage.getItem('AGENT_TOKEN_ENDPOINT');
+    if (saved && !CFG.tokenEndpoint) CFG.tokenEndpoint = saved;
+  } catch(e){}
+
+  function manualHost(){
+    var ep = (CFG.tokenEndpoint || '').trim();
+    if (!ep) return null;
+    var m = ep.match(/^(https:\/\/[^\/]+)/i);
+    return m ? m[1] : null;
+  }
+
   function fetchToken(schema, key){
-    /* 1순위: 사용자가 붙여넣은 공식 토큰 엔드포인트, 2순위: 자동 추정 호스트 */
-    var manual = (CFG.tokenEndpoints && CFG.tokenEndpoints[key] || '').trim();
     var urls = [];
-    if (manual) urls.push(manual);
+    /* 1순위: 붙여넣은 엔드포인트의 호스트 (봇 스키마만 교체) */
+    var mh = manualHost();
+    if (mh) urls.push(tokenUrl(schema, mh));
+    /* 2순위: 이미 성공한 호스트 → 3순위: 환경 ID 자동 추정 (경로도 2종 시도) */
     (HOST_OK ? [HOST_OK] : (CFG.hostCandidates || [CFG.host])).forEach(function(h){
-      urls.push(tokenUrl(schema, h));
+      TOKEN_PATHS.forEach(function(p){
+        var u = h + p(schema);
+        if (urls.indexOf(u) === -1) urls.push(u);
+      });
     });
     var cands = urls;
     var idx = 0, errs = [];
@@ -1764,6 +1795,27 @@ window.AGENT_CFG = {
   window.__agentDebug = {
     conns: CONNS, conn: conn, tokenUrl: tokenUrl, embedUrl: embedUrl, popupUrl: popupUrl,
     hosts: (CFG.hostCandidates || []),
+    /* 콘솔에서 엔드포인트를 즉시 적용 + 저장 + 5개 전부 테스트 */
+    setEndpoint: function(url){
+      CFG.tokenEndpoint = String(url || '').trim();
+      HOST_OK = null;
+      try { localStorage.setItem('AGENT_TOKEN_ENDPOINT', CFG.tokenEndpoint); } catch(e){}
+      console.info('[agent] 엔드포인트 설정됨. 호스트 =', manualHost());
+      return window.__agentDebug.testAll();
+    },
+    testAll: function(){
+      var keys = Object.keys(CFG.schemas);
+      return Promise.all(keys.map(function(k){
+        return fetchToken(CFG.schemas[k], k)
+          .then(function(){ console.info('  ✅', k); return true; })
+          .catch(function(e){ console.error('  ❌', k, '→', e.message); return false; });
+      })).then(function(r){
+        var ok = r.filter(Boolean).length;
+        console.info('[agent] 결과: ' + ok + '/' + keys.length + ' 성공'
+          + (ok === keys.length ? ' → 새로고침하면 정상 작동합니다!' : ''));
+        return ok;
+      });
+    },
     testToken: function(key){
       var k = key || '부모';
       return fetchToken(CFG.schemas[k], k)
@@ -1789,8 +1841,7 @@ window.AGENT_CFG = {
     el.style.cssText += 'position:relative;';
     el.innerHTML =
       '<iframe id="childIfr" style="width:100%;height:100%;border:0;" ' +
-      'allow="microphone; clipboard-write" ' +
-      'sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"></iframe>' +
+      'allow="microphone; clipboard-write"></iframe>' +
       '<div id="childFallback" style="display:none;position:absolute;left:0;right:0;bottom:0;' +
       'background:#fff8e1;border-top:2px solid #ffd54f;padding:10px 12px;font-size:.85rem;' +
       'color:#6B4E00;font-weight:700;text-align:center;">' +
