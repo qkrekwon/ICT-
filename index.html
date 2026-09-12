@@ -1302,31 +1302,15 @@ function pickFromCard(name){
 })();
 
 </script>
-<!-- ===================== 실제 에이전트 연결 레이어 v2 (Copilot Studio) ===================== -->
+<!-- ===================== 부모 + 자식 에이전트 직접 연결 레이어 v3 ===================== -->
 <style>
   .conn-badge{position:fixed;left:14px;bottom:14px;z-index:200;background:#23405C;color:#fff;font-size:.72rem;
     padding:8px 13px;border-radius:999px;opacity:.92;font-weight:800;cursor:pointer;border:none;
-    box-shadow:0 4px 14px rgba(35,64,92,.3);}
+    box-shadow:0 4px 14px rgba(35,64,92,.3);font-family:inherit;}
   .conn-badge.live{background:#2F7A57;} .conn-badge.err{background:#C0392B;} .conn-badge.wait{background:#B8860B;}
-  .setup-mask{position:fixed;inset:0;z-index:300;background:rgba(35,64,92,.62);backdrop-filter:blur(5px);
-    display:none;align-items:center;justify-content:center;padding:18px;}
-  .setup-mask.open{display:flex;}
-  .setup{background:#fff;border-radius:22px;max-width:560px;width:100%;max-height:88vh;overflow:auto;
-    padding:22px;box-shadow:0 18px 50px rgba(0,0,0,.28);font-size:.9rem;color:#23405C;}
-  .setup h3{font-size:1.08rem;font-weight:900;margin-bottom:6px;}
-  .setup p{font-size:.82rem;line-height:1.6;opacity:.85;margin-bottom:12px;}
-  .setup label{display:block;font-weight:800;font-size:.8rem;margin:14px 0 6px;}
-  .setup input{width:100%;border:2px solid #DCE6F0;border-radius:12px;padding:11px 13px;font-size:.84rem;
-    font-family:inherit;outline:none;}
-  .setup input:focus{border-color:#5AA0E4;}
-  .setup .row{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;}
-  .setup button{flex:1;min-width:120px;border:none;border-radius:12px;padding:12px;font-weight:900;
-    font-size:.85rem;cursor:pointer;font-family:inherit;}
-  .setup .ok{background:#2E6FB8;color:#fff;} .setup .gh{background:#EEF3F9;color:#23405C;}
-  .setup .log{margin-top:14px;background:#F6F9FC;border:1px solid #DCE6F0;border-radius:12px;padding:12px;
-    font-size:.74rem;line-height:1.65;white-space:pre-wrap;max-height:190px;overflow:auto;font-family:ui-monospace,Menlo,monospace;}
-  .setup .hint{background:#FFF6E3;border:1px solid #F0D9A8;border-radius:12px;padding:11px 13px;
-    font-size:.76rem;line-height:1.6;margin-top:12px;}
+  .back-btn{margin-left:8px;background:rgba(255,255,255,.22);border:none;color:#fff;height:34px;padding:0 12px;
+    border-radius:12px;cursor:pointer;font-size:.76rem;font-weight:800;font-family:inherit;display:none;}
+  .back-btn.on{display:inline-block;}
   .typing i{display:inline-block;width:6px;height:6px;margin:0 2px;border-radius:50%;background:#8CA6BE;
     animation:tp 1s infinite ease-in-out;}
   .typing i:nth-child(2){animation-delay:.15s;} .typing i:nth-child(3){animation-delay:.3s;}
@@ -1335,208 +1319,101 @@ function pickFromCard(name){
 </style>
 <script>
 /* =========================================================================
-   설정: 아래 값을 직접 넣거나, 페이지 좌측 하단 배지를 클릭해 화면에서 입력하세요.
-   화면에서 입력한 값은 브라우저에 저장되어 다음 방문에도 유지됩니다.
+   부모 에이전트 + 자식 에이전트 4개를 모두 이 페이지에서 직접 호출합니다.
+   Copilot Studio의 오케스트레이션 설정에 의존하지 않으므로,
+   자식 에이전트가 확실하게 호출됩니다.
    ========================================================================= */
+/* [FIX] 환경 ID에서 Power Platform API 호스트를 자동 산출합니다.
+   규칙: GUID(하이픈 제거, 32자) -> 앞 30자 + "." + 뒤 2자
+   기존 파일은 "...a0c" + "." + "0" 으로 한 칸 밀려 ERR_NAME_NOT_RESOLVED 발생 */
+function __ppHosts(envId){
+  var g = String(envId).replace(/^Default-/i, "").replace(/-/g, "").toLowerCase();
+  var out = [];
+  if (g.length === 32) {
+    out.push("https://" + g.slice(0, 30) + "." + g.slice(30) + ".environment.api.powerplatform.com");
+    out.push("https://" + g.slice(0, 31) + "." + g.slice(31) + ".environment.api.powerplatform.com");
+  }
+  return out;
+}
 window.AGENT_CFG = {
-  // ① 토큰 엔드포인트 (비워두면 아래 ②의 포함 방식으로 연결됩니다)
-  tokenEndpoint: "",
-  // ② 포함(iframe) 주소 — 부모에이전트 실제 연결 주소. 방문자는 설정 없이 바로 대화할 수 있습니다.
-  embedUrl: "https://copilotstudio.microsoft.com/environments/Default-a5a060c4-00b2-4343-b6c9-23625439a0c0/bots/cr9fa_bot_3mXvDR/canvas?__version__=2&enableFileAttachment=false&cliAgent=true",
   environmentId: "Default-a5a060c4-00b2-4343-b6c9-23625439a0c0",
-  botSchemaName: "cr9fa_bot_3mXvDR",
-  botId: "8deab730-fe85-447b-9894-a6c5f5aa4d79",
+  host: __ppHosts("Default-a5a060c4-00b2-4343-b6c9-23625439a0c0")[0],
+  hostCandidates: __ppHosts("Default-a5a060c4-00b2-4343-b6c9-23625439a0c0"),
   directLineBase: "https://directline.botframework.com/v3/directline",
   userId: "web_" + Math.random().toString(36).slice(2, 10),
-  userName: "웹사용자"
+  userName: "웹사용자",
+  // 부모 + 자식 4개 스키마 이름
+  schemas: {
+    "부모":     "cr9fa_bot_3mXvDR",
+    "나라퀴즈": "cr9fa_bot_YxFhCu",
+    "사물퀴즈": "cr9fa_bot_yQ1saH",
+    "직업체험": "cr9fa_bot_CDmedu",
+    "실제미션": "cr9fa_bot_tEpA9Y"
+  }
 };
 
 (function(){
   var CFG = window.AGENT_CFG;
-  var LSK = 'agentCfg_v2';
 
-  /* 저장된 설정 불러오기 */
-  try{
-    var saved = JSON.parse(localStorage.getItem(LSK) || '{}');
-    if(saved.tokenEndpoint) CFG.tokenEndpoint = saved.tokenEndpoint;
-    if(saved.embedUrl) CFG.embedUrl = saved.embedUrl;
-  }catch(e){}
+  /* 로컬(오프라인) 부모 로직 원본을 보관 — CORS 차단 시 대체 모드에서 사용 */
+  var ORIG = { reply: window.reply, handle: window.handle, greet: window.greet,
+               startActivity: window.startActivity, openActivity: window.openActivity };
+  var HYBRID = false;
+
+  function tokenUrl(schema, host){
+    return (host || CFG.host) + '/powervirtualagents/botsbyschema/' + schema +
+           '/directline/token?api-version=2022-03-01';
+  }
+  /* [FIX] 호스트 후보를 순서대로 시도하고, 성공한 호스트를 고정합니다. */
+  var HOST_OK = null;
+  function fetchToken(schema, key){
+    var cands = HOST_OK ? [HOST_OK] : (CFG.hostCandidates || [CFG.host]);
+    var idx = 0, errs = [];
+    function attempt(){
+      if (idx >= cands.length) {
+        return Promise.reject(new Error(key + ' 토큰 실패 -> ' + errs.join(' | ')));
+      }
+      var host = cands[idx++];
+      return fetch(tokenUrl(schema, host))
+        .then(function(r){
+          if (!r.ok) { errs.push(host + ' HTTP ' + r.status); return attempt(); }
+          return r.json().then(function(j){
+            if (!j || !j.token) { errs.push(host + ' token-missing'); return attempt(); }
+            HOST_OK = host; CFG.host = host;
+            if (window.console) console.info('[agent] token OK host:', host);
+            return j;
+          });
+        })
+        .catch(function(e){
+          if (e && /토큰 실패/.test(e.message)) throw e;
+          errs.push(host + ' ' + (e && e.message ? e.message : 'fetch failed'));
+          return attempt();
+        });
+    }
+    return attempt();
+  }
+  function embedUrl(schema){
+    return 'https://copilotstudio.microsoft.com/environments/' + CFG.environmentId +
+           '/bots/' + schema + '/canvas?__version__=2&enableFileAttachment=false&cliAgent=true';
+  }
 
   /* ---------- 상태 배지 ---------- */
   var badge = document.createElement('button');
   badge.className = 'conn-badge'; badge.id = 'connBadge';
-  badge.onclick = function(){ openSetup(); };
   document.body.appendChild(badge);
   function setBadge(t, cls){ badge.textContent = t; badge.className = 'conn-badge ' + (cls||''); }
 
-  /* ---------- 설정 패널 ---------- */
-  var mask = document.createElement('div');
-  mask.className = 'setup-mask'; mask.id = 'setupMask';
-  mask.innerHTML =
-    '<div class="setup">' +
-      '<h3>🔌 실제 에이전트 연결 설정</h3>' +
-      '<p>Copilot Studio에서 복사한 주소를 붙여넣고 <b>연결 테스트</b>를 누르세요. 값은 이 브라우저에 저장됩니다.</p>' +
-      '<label>① 토큰 엔드포인트 <span style="font-weight:600;opacity:.7">(채널 → 모바일 앱)</span></label>' +
-      '<input id="cfgToken" placeholder="https://....environment.api.powerplatform.com/powervirtualagents/botsbyschema/cr9fa_bot_3mXvDR/directline/token?api-version=2022-03-01" />' +
-      '<label>② 또는 포함(iframe) 주소 <span style="font-weight:600;opacity:.7">(채널 → 사용자 지정 웹사이트)</span></label>' +
-      '<input id="cfgEmbed" placeholder="https://copilotstudio.microsoft.com/environments/.../bots/.../webchat" />' +
-      '<div class="hint">💡 <b>①이 안 되면 ②를 쓰세요.</b> ②는 CORS·인증 문제가 없어 거의 항상 연결됩니다. 단, 페이지의 커스텀 채팅 디자인 대신 마이크로소프트 기본 채팅창이 표시됩니다.</div>' +
-      '<div class="row">' +
-        '<button class="ok" id="btnTest">연결 테스트 &amp; 저장</button>' +
-        '<button class="gh" id="btnAuto">자동 탐색</button>' +
-        '<button class="gh" id="btnClose">닫기</button>' +
-      '</div>' +
-      '<div class="log" id="setupLog">대기 중…</div>' +
-    '</div>';
-  document.body.appendChild(mask);
-  mask.addEventListener('click', function(e){ if(e.target === mask) mask.classList.remove('open'); });
+  /* ---------- 헤더에 "부모로 돌아가기" 버튼 ---------- */
+  var backBtn = document.createElement('button');
+  backBtn.className = 'back-btn'; backBtn.id = 'backBtn'; backBtn.textContent = '↩︎ 돌아가기';
+  (function(){
+    var head = document.getElementById('chatHead');
+    var close = head ? head.querySelector('.close') : null;
+    if(head && close) head.insertBefore(backBtn, close); else if(head) head.appendChild(backBtn);
+  })();
+  backBtn.onclick = function(){ returnToParent(true); };
 
-  function logLine(t){
-    var el = document.getElementById('setupLog');
-    el.textContent += '\n' + t; el.scrollTop = el.scrollHeight;
-  }
-  function logReset(t){ document.getElementById('setupLog').textContent = t; }
-  function openSetup(){
-    document.getElementById('cfgToken').value = CFG.tokenEndpoint || '';
-    document.getElementById('cfgEmbed').value = CFG.embedUrl || '';
-    mask.classList.add('open');
-  }
-  window.openAgentSetup = openSetup;
-
-  function saveCfg(){
-    try{ localStorage.setItem(LSK, JSON.stringify({tokenEndpoint: CFG.tokenEndpoint, embedUrl: CFG.embedUrl})); }catch(e){}
-  }
-
-  /* 토큰 엔드포인트 한 개를 실제로 호출해 검증 */
-  function probe(url){
-    return fetch(url, { method:'GET' })
-      .then(function(r){
-        return r.text().then(function(txt){
-          var j = null; try{ j = JSON.parse(txt); }catch(e){}
-          if(!r.ok) return { ok:false, code:r.status, msg:'HTTP ' + r.status + ' ' + txt.slice(0,120) };
-          if(!j || !j.token) return { ok:false, code:r.status, msg:'응답에 token 없음: ' + txt.slice(0,120) };
-          return { ok:true, token:j.token, url:url };
-        });
-      })
-      .catch(function(e){ return { ok:false, code:0, msg:'네트워크/CORS 차단 (' + e.message + ')' }; });
-  }
-
-  /* 입력값에서 가능한 엔드포인트 후보 생성 */
-  function candidates(input){
-    var list = [], v = (input||'').trim();
-    if(v){
-      list.push(v);
-      // 포함 URL만 붙여넣은 경우 → 환경 호스트 추출 시도
-      var env = v.match(/environments\/([0-9a-zA-Z-]+)/);
-      var host = v.match(/^https:\/\/([^\/]+)/);
-      if(host && /powerplatform\.com/.test(host[1]) && v.indexOf('/directline/token') < 0){
-        list.push('https://' + host[1] + '/powervirtualagents/botsbyschema/' +
-                  CFG.botSchemaName + '/directline/token?api-version=2022-03-01');
-      }
-      if(v.indexOf('api-version') < 0 && v.indexOf('/directline/token') > 0){
-        list.push(v + (v.indexOf('?')>0?'&':'?') + 'api-version=2022-03-01');
-      }
-    }
-    // 환경 ID에서 Power Platform 호스트를 유도한 표준 엔드포인트
-    var hex = (CFG.environmentId || '').replace(/^Default-/i, '').replace(/-/g, '');
-    if(hex.length === 32){
-      list.push('https://' + hex.slice(0,31) + '.' + hex.slice(31) +
-                '.environment.api.powerplatform.com/powervirtualagents/botsbyschema/' +
-                CFG.botSchemaName + '/directline/token?api-version=2022-03-01');
-    }
-    // 레거시(구 PVA) 엔드포인트 — 환경에 따라 동작할 수 있음
-    list.push('https://powerva.microsoft.com/api/botmanagement/v1/directline/directlinetoken?botId=' + CFG.botId);
-    var uniq = [], seen = {};
-    list.forEach(function(u){ if(u && !seen[u]){ seen[u]=1; uniq.push(u); } });
-    return uniq;
-  }
-
-  document.getElementById('btnClose').onclick = function(){ mask.classList.remove('open'); };
-
-  document.getElementById('btnTest').onclick = function(){
-    var tk = document.getElementById('cfgToken').value.trim();
-    var em = document.getElementById('cfgEmbed').value.trim();
-    if(em && !tk){
-      CFG.embedUrl = em; CFG.tokenEndpoint = ''; saveCfg();
-      logReset('✅ 포함(iframe) 주소를 저장했습니다. 페이지를 새로고침하면 적용됩니다.');
-      setTimeout(function(){ location.reload(); }, 1200);
-      return;
-    }
-    if(!tk){ logReset('⚠️ ① 또는 ② 중 하나는 입력해야 합니다.'); return; }
-    logReset('⏳ 토큰 엔드포인트를 확인하는 중…');
-    probe(tk).then(function(res){
-      if(res.ok){
-        CFG.tokenEndpoint = tk; CFG.embedUrl = em; saveCfg();
-        logLine('✅ 성공! 토큰을 정상 발급받았습니다. 잠시 후 페이지를 새로고침합니다.');
-        setTimeout(function(){ location.reload(); }, 1200);
-      } else {
-        logLine('❌ 실패: ' + res.msg);
-        if(res.code === 401 || res.code === 403) logLine('→ 에이전트 인증이 아직 "인증 없음"이 아니거나, 재게시가 반영되지 않았습니다.');
-        else if(res.code === 404) logLine('→ 주소가 잘못되었거나 스키마 이름이 다릅니다.');
-        else if(res.code === 0) logLine('→ 브라우저 CORS 차단입니다. 이 경우 ② 포함(iframe) 주소를 사용하세요. (파일을 file:// 로 직접 열었다면 웹서버로 올려서 여세요.)');
-        logLine('\n👉 "자동 탐색"을 눌러 다른 형식도 시도해볼 수 있습니다.');
-      }
-    });
-  };
-
-  document.getElementById('btnAuto').onclick = function(){
-    var tk = document.getElementById('cfgToken').value.trim();
-    var list = candidates(tk);
-    logReset('🔍 후보 ' + list.length + '개를 순서대로 시도합니다…');
-    var i = 0;
-    (function next(){
-      if(i >= list.length){
-        logLine('\n❌ 모든 후보 실패. ② 포함(iframe) 주소 사용을 권장합니다.');
-        return;
-      }
-      var u = list[i++];
-      logLine('\n[' + i + '] ' + u.slice(0, 96) + (u.length>96?'…':''));
-      probe(u).then(function(res){
-        if(res.ok){
-          logLine('   ✅ 성공! 이 주소로 저장합니다.');
-          CFG.tokenEndpoint = u; saveCfg();
-          document.getElementById('cfgToken').value = u;
-          setTimeout(function(){ location.reload(); }, 1400);
-        } else {
-          logLine('   ❌ ' + res.msg.slice(0, 110));
-          next();
-        }
-      });
-    })();
-  };
-
-  /* 진단 도구는 모든 모드에서 사용 가능하게 노출 */
-  window.__agentDebug = { probe: probe, candidates: candidates, openSetup: openSetup, cfg: CFG };
-
-  /* ---------- 모드 판정 ---------- */
-  var MODE = CFG.tokenEndpoint ? 'directline' : (CFG.embedUrl ? 'iframe' : 'demo');
-
-  if(MODE === 'demo'){
-    setBadge('⚠️ 데모 모드 · 클릭해서 연결하기');
-    setTimeout(function(){ if(!CFG.tokenEndpoint && !CFG.embedUrl) openSetup(); }, 900);
-    return;
-  }
-
-  /* ---------- iframe 모드 ---------- */
-  if(MODE === 'iframe'){
-    setBadge('🟢 에이전트 연결됨 (포함 모드)', 'live');
-    var chat = document.querySelector('.chat');
-    var wrap = document.createElement('div');
-    wrap.id = 'agentFrameWrap';
-    var safeSrc = String(CFG.embedUrl).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
-    wrap.innerHTML = '<iframe src="' + safeSrc + '" allow="microphone; clipboard-write" title="사회성 향상 게임 에이전트"></iframe>';
-    chat.appendChild(wrap);
-    ['tokenBar','body','quick'].forEach(function(id){ var el=document.getElementById(id); if(el) el.style.display='none'; });
-    var form = document.querySelector('.chat-input'); if(form) form.style.display = 'none';
-    wrap.style.display = 'block';
-    window.openChat = function(){ document.getElementById('overlay').classList.add('open'); };
-    window.pickFromCard = function(){ window.openChat(); };
-    return;
-  }
-
-  /* ---------- Direct Line 모드 ---------- */
-  var DL = { token:null, convId:null, watermark:null, ws:null, ready:false, starting:false, pollTimer:null, seen:{} };
-
+  /* ---------- 공통 UI 헬퍼 ---------- */
   function typingOn(){
     if(document.getElementById('typingMsg')) return;
     var d = document.createElement('div');
@@ -1545,6 +1422,18 @@ window.AGENT_CFG = {
     var b = document.getElementById('body'); b.appendChild(d); b.scrollTop = b.scrollHeight;
   }
   function typingOff(){ var t = document.getElementById('typingMsg'); if(t && t.parentNode) t.parentNode.removeChild(t); }
+
+  function tidy(t){
+    return String(t)
+      .replace(/\[\d+\]:\s*\S+(\s+".*?")?/g, '')
+      .replace(/\[(\d+)\]/g, '')
+      .replace(/\*\*(.*?)\*\*/g, '$1')
+      .replace(/^#{1,6}\s*/gm, '')
+      .replace(/^\s*[-*]\s+/gm, '• ')
+      .replace(/^[\s\u200b]*⚠️?\s*제공되는 정보와 설명에는 오류가 있을 수 있습니다\.?\s*$/gm, '')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
 
   function syncTokens(text){
     var m = text.match(/남은\s*토큰\s*[:은는]?\s*(\d+)/) ||
@@ -1559,7 +1448,7 @@ window.AGENT_CFG = {
 
   function buildQuick(text){
     var out = [], seen = {}, acts = ['나라퀴즈','사물퀴즈','직업체험','실제미션'];
-    var re = /(?:[1-4]️⃣|^\s*[1-4][.)])\s*(?:추천\s*[1-4]\s*[:：]\s*)?(.+)$/gm, m;
+    var re = /(?:[1-4]️⃣|^\s*[1-6][.)])\s*(?:추천\s*[1-4]\s*[:：]\s*)?(.+)$/gm, m;
     while((m = re.exec(text)) !== null){
       var label = m[1].replace(/\(.*?\)/g,'').trim();
       for(var i=0;i<acts.length;i++){ if(label.indexOf(acts[i])>=0) label = acts[i]; }
@@ -1573,12 +1462,110 @@ window.AGENT_CFG = {
     return [];
   }
 
-  function renderBot(text){
-    var isChild = text.indexOf('제공되는 정보와 설명에는 오류가 있을 수 있습니다') >= 0;
-    var clean = text.replace(/^[\s\u200b]*⚠️?\s*제공되는 정보와 설명에는 오류가 있을 수 있습니다\.?\s*$/gm,'').trim();
-    if(isChild){
-      var act = detectActivity(clean) || CUR_AGENT;
-      if(act && act !== CUR_AGENT) setAgentName(act + ' 에이전트');
+  /* =====================================================================
+     Direct Line 연결 관리자 — 에이전트별로 독립된 대화를 유지
+     ===================================================================== */
+  function Conn(key, schema){
+    this.key = key; this.schema = schema;
+    this.token = null; this.convId = null; this.watermark = null;
+    this.ready = false; this.starting = false; this.timer = null; this.seen = {};
+    this.onText = null;
+  }
+  Conn.prototype.post = function(path, body){
+    return fetch(CFG.directLineBase + path, {
+      method:'POST',
+      headers:{ 'Authorization':'Bearer ' + this.token, 'Content-Type':'application/json' },
+      body: body ? JSON.stringify(body) : undefined
+    });
+  };
+  Conn.prototype.handle = function(acts){
+    var self = this;
+    (acts||[]).forEach(function(a){
+      if(a.type !== 'message') return;
+      if(!a.from || a.from.id === CFG.userId) return;
+      if(a.id && self.seen[a.id]) return;
+      if(a.id) self.seen[a.id] = 1;
+      var text = (a.text||'').trim();
+      if(!text) return;
+      if(self.onText) self.onText(text, a);
+    });
+  };
+  Conn.prototype.poll = function(){
+    var self = this;
+    fetch(CFG.directLineBase + '/conversations/' + this.convId + '/activities' +
+          (this.watermark ? '?watermark=' + this.watermark : ''),
+          { headers:{ 'Authorization':'Bearer ' + this.token } })
+      .then(function(r){ return r.json(); })
+      .then(function(j){ if(j.watermark) self.watermark = j.watermark; self.handle(j.activities); })
+      .catch(function(){});
+  };
+  Conn.prototype.startPolling = function(){
+    var self = this;
+    if(!this.timer) this.timer = setInterval(function(){ self.poll(); }, 1200);
+  };
+  Conn.prototype.connect = function(){
+    var self = this;
+    if(this.ready) return Promise.resolve(this);
+    if(this._p) return this._p;
+    this.starting = true;
+    this._p = fetchToken(this.schema, this.key)
+      .then(function(j){ self.token = j.token; return self.post('/conversations'); })
+      .then(function(r){ if(!r.ok) throw new Error(self.key + ' 대화생성 HTTP ' + r.status); return r.json(); })
+      .then(function(c){
+        self.convId = c.conversationId;
+        if(c.token) self.token = c.token;
+        self.ready = true; self.starting = false;
+        if(c.streamUrl && 'WebSocket' in window){
+          try{
+            var ws = new WebSocket(c.streamUrl);
+            ws.onmessage = function(ev){
+              if(!ev.data) return;
+              var j2 = JSON.parse(ev.data);
+              if(j2.watermark) self.watermark = j2.watermark;
+              self.handle(j2.activities);
+            };
+            ws.onclose = function(){ self.startPolling(); };
+            ws.onerror = function(){ self.startPolling(); };
+          }catch(e){ self.startPolling(); }
+        } else { self.startPolling(); }
+        return self.post('/conversations/' + self.convId + '/activities', {
+          type:'event', name:'startConversation',
+          from:{ id:CFG.userId, name:CFG.userName }, locale:'ko-KR'
+        }).then(function(){ return self; });
+      });
+    return this._p;
+  };
+  Conn.prototype.send = function(text){
+    var self = this;
+    return this.connect().then(function(){
+      return self.post('/conversations/' + self.convId + '/activities', {
+        type:'message', from:{ id:CFG.userId, name:CFG.userName }, text:text, locale:'ko-KR'
+      });
+    });
+  };
+
+  /* ---------- 에이전트 레지스트리 ---------- */
+  var CONNS = {};
+  function conn(key){
+    if(!CONNS[key]) CONNS[key] = new Conn(key, CFG.schemas[key]);
+    return CONNS[key];
+  }
+
+  /* =====================================================================
+     라우터 — 부모 ↔ 자식 전환
+     ===================================================================== */
+  var ACTIVE = '부모';          // 현재 대화 중인 에이전트
+  var pending = null;           // 사용자가 고른 활동(개수 입력 대기)
+  var COST = window.COST || {"나라퀴즈":10,"사물퀴즈":10,"직업체험":10,"실제미션":2};
+
+  function isChildKey(k){ return k && k !== '부모' && CFG.schemas[k]; }
+
+  function showFor(key, text){
+    typingOff();
+    var clean = tidy(text);
+    if(!clean) return;
+    if(isChildKey(key)){
+      if(CUR_AGENT !== key) setAgentName(key + ' 에이전트');
       bot(clean, true);
     } else {
       if(CUR_AGENT) setAgentName('사회성 향상 게임 에이전트');
@@ -1588,100 +1575,277 @@ window.AGENT_CFG = {
     quick(buildQuick(clean));
   }
 
-  function post(path, body){
-    return fetch(CFG.directLineBase + path, {
-      method:'POST',
-      headers:{ 'Authorization':'Bearer ' + DL.token, 'Content-Type':'application/json' },
-      body: body ? JSON.stringify(body) : undefined
-    });
+  function wire(key){
+    var c = conn(key);
+    c.onText = function(text){ if(ACTIVE === key) showFor(key, text); };
+    return c;
   }
 
-  function handleActivities(acts){
-    (acts||[]).forEach(function(a){
-      if(a.type !== 'message') return;
-      if(!a.from || a.from.id === CFG.userId) return;
-      if(a.id && DL.seen[a.id]) return;
-      if(a.id) DL.seen[a.id] = 1;
-      var text = (a.text||'').trim();
-      if(!text) return;
-      typingOff();
-      renderBot(text);
-      if(a.suggestedActions && a.suggestedActions.actions && a.suggestedActions.actions.length){
-        quick(a.suggestedActions.actions.map(function(x){ return x.title || x.value; }));
-      }
-    });
-  }
-
-  function poll(){
-    fetch(CFG.directLineBase + '/conversations/' + DL.convId + '/activities' +
-          (DL.watermark ? '?watermark=' + DL.watermark : ''),
-          { headers:{ 'Authorization':'Bearer ' + DL.token } })
-      .then(function(r){ return r.json(); })
-      .then(function(j){ if(j.watermark) DL.watermark = j.watermark; handleActivities(j.activities); })
-      .catch(function(){});
-  }
-  function startPolling(){ if(!DL.pollTimer) DL.pollTimer = setInterval(poll, 1200); }
-
-  function connect(){
-    if(DL.ready || DL.starting) return Promise.resolve();
-    DL.starting = true;
-    setBadge('⏳ 에이전트 연결 중…', 'wait');
-    return fetch(CFG.tokenEndpoint)
-      .then(function(r){ if(!r.ok) throw new Error('토큰 발급 HTTP ' + r.status); return r.json(); })
-      .then(function(j){ if(!j.token) throw new Error('응답에 token 없음'); DL.token = j.token; return post('/conversations'); })
-      .then(function(r){ if(!r.ok) throw new Error('대화 생성 HTTP ' + r.status); return r.json(); })
-      .then(function(c){
-        DL.convId = c.conversationId;
-        if(c.token) DL.token = c.token;
-        DL.ready = true; DL.starting = false;
-        setBadge('🟢 부모 에이전트 연결됨', 'live');
-        if(c.streamUrl && 'WebSocket' in window){
-          try{
-            DL.ws = new WebSocket(c.streamUrl);
-            DL.ws.onmessage = function(ev){
-              if(!ev.data) return;
-              var j2 = JSON.parse(ev.data);
-              if(j2.watermark) DL.watermark = j2.watermark;
-              handleActivities(j2.activities);
-            };
-            DL.ws.onclose = startPolling; DL.ws.onerror = startPolling;
-          }catch(e){ startPolling(); }
-        } else { startPolling(); }
-        return post('/conversations/' + DL.convId + '/activities', {
-          type:'event', name:'startConversation',
-          from:{ id:CFG.userId, name:CFG.userName }, locale:'ko-KR'
-        });
-      })
-      .then(function(){ typingOn(); })
-      .catch(function(e){
-        DL.starting = false;
-        setBadge('🔴 연결 실패 · 클릭해서 설정', 'err');
-        typingOff();
-        add('⚠️ 에이전트에 연결하지 못했어요.\n사유: ' + e.message +
-            '\n\n왼쪽 아래 빨간 배지를 눌러 주소를 확인해주세요.', 'bot');
-      });
-  }
-
-  function send(text){
-    if(!DL.ready){ connect().then(function(){ if(DL.ready) send(text); }); return; }
+  /* 자식 에이전트로 전환 */
+  function goChild(act, count){
+    ACTIVE = act;
+    backBtn.classList.add('on');
+    setAgentName(act + ' 에이전트');
     typingOn();
-    post('/conversations/' + DL.convId + '/activities', {
-      type:'message', from:{ id:CFG.userId, name:CFG.userName }, text:text, locale:'ko-KR'
-    }).catch(function(){ typingOff(); add('⚠️ 메시지를 보내지 못했어요. 잠시 후 다시 시도해주세요.', 'bot'); });
+    var c = wire(act);
+    // 닉네임·연령대·개수를 자식에게 전달
+    var intro = '안녕하세요! 제 닉네임은 ' + (S.nick || '친구') + '이고, ' +
+                (S.age || '초등 고학년') + '입니다. ' +
+                act + ' ' + count + (act === '직업체험' ? '개 직업' : '문제') + ' 시작해주세요!';
+    c.connect().then(function(){
+      setTimeout(function(){ c.send(intro); }, 400);
+    }).catch(function(e){
+      typingOff();
+      if(openChildFrame(act, count)) return;   // 창으로 대체
+      add('⚠️ ' + act + ' 에이전트에 연결하지 못했어요.\n(' + e.message + ')', 'bot');
+      returnToParent(false);
+    });
   }
 
-  window.handle = function(text){ me(text); quick([]); send(text); };
-  window.greet = function(){ setAgentName('사회성 향상 게임 에이전트'); connect(); };
-  window.reply = function(){ /* 로컬 시뮬레이션 비활성화 */ };
-  window.pickFromCard = function(name){ openChat(); setTimeout(function(){ window.handle(name); }, 400); };
-  window.__agentDebug.renderBot = renderBot;
-  window.__agentDebug.buildQuick = buildQuick;
-  window.__agentDebug.handleActivities = handleActivities;
-  window.__agentDebug.DL = DL;
-  setBadge('🔗 실제 에이전트 모드 · 연결 준비됨');
+  /* 부모로 복귀 */
+  function returnToParent(notify){
+    if(ACTIVE === '부모') return;
+    var prev = ACTIVE;
+    ACTIVE = '부모';
+    backBtn.classList.remove('on');
+    setAgentName('사회성 향상 게임 에이전트');
+    if(notify){
+      bot((S.nick ? S.nick + '님!\n' : '') + prev + ' 활동을 마쳤어요.\n현재 남은 토큰은 ' + S.tokens + '토큰입니다.\n다른 활동을 선택하시겠어요?', false);
+      quick(RECO[S.age] || ['나라퀴즈','사물퀴즈','직업체험','실제미션']);
+      conn('부모').send('[시스템] 사용자가 ' + prev + ' 활동을 종료하고 돌아왔습니다. 남은 토큰은 ' + S.tokens + '토큰입니다.');
+    }
+  }
+
+  /* ---------- 사용자 입력 처리 ---------- */
+  window.handle = function(text){
+    me(text);
+    quick([]);
+    var s = (text || '').replace(/\s/g,'');
+
+    // 종료 의사 → 부모 복귀
+    if(isChildKey(ACTIVE) && /^(그만|종료|나가기|중단|메뉴|돌아가기)$/.test(s)){
+      returnToParent(true);
+      return;
+    }
+
+    // 자식과 대화 중이면 자식에게 전달
+    if(isChildKey(ACTIVE)){
+      typingOn();
+      conn(ACTIVE).send(text);
+      return;
+    }
+
+    // ---- 부모 모드 ----
+    var act = (typeof detectActivity === 'function') ? detectActivity(text) : null;
+
+    // 활동 선택 → 개수 입력 대기
+    if(act && S.nick && S.age){
+      pending = act;
+      typingOn();
+      conn('부모').send(text);
+      return;
+    }
+
+    // 개수 입력 → 토큰 차감 후 자식 호출
+    if(pending){
+      var m = (text||'').match(/\d+/);
+      if(m){
+        var n = parseInt(m[0], 10);
+        var cost = (COST[pending] || 10) * n;
+        if(cost > S.tokens){
+          bot(S.nick + '님!\n' + pending + ' ' + n + '개 이용에는 ' + cost + '토큰이 필요합니다.\n현재 보유 토큰은 ' + S.tokens + '토큰입니다.\n토큰이 부족하여 이용할 수 없습니다.', false);
+          quick(RECO[S.age] || []);
+          pending = null;
+          return;
+        }
+        var before = S.tokens;
+        S.tokens -= cost;
+        var bar = document.getElementById('tokenBar');
+        if(bar) bar.textContent = '🪙 보유 토큰: ' + S.tokens;
+        bot(S.nick + '님!\n' + pending + ' ' + n + '개를 시작할게요.\n' + cost + '토큰이 차감됩니다.\n\n현재 토큰: ' + before + '\n차감 토큰: ' + cost + '\n남은 토큰: ' + S.tokens, false);
+        var target = pending; pending = null;
+        setTimeout(function(){
+          sys('🔗 ' + (AGENT_EMO[target]||'') + ' ' + target + ' 에이전트에 연결하고 있어요...');
+          goChild(target, n);
+        }, 700);
+        return;
+      }
+    }
+
+    // 그 외는 부모에게
+    typingOn();
+    conn('부모').send(text);
+  };
+
+  /* 연령대/닉네임을 부모 응답에서 추출해 로컬에도 기록 */
+  var parentConn = wire('부모');
+  var origOnText = parentConn.onText;
+  parentConn.onText = function(text, a){
+    if(!S.age){
+      var ag = (typeof detectAge === 'function') ? detectAge(text) : null;
+      if(ag) S.age = ag;
+    }
+    var nm = text.match(/^\s*안녕하세요,\s*([^\s!님]{1,12})님/m) || text.match(/([^\s!님\n]{1,12})님[!,]/);
+    if(nm && !S.nick) S.nick = nm[1];
+    if(ACTIVE === '부모') showFor('부모', text);
+  };
+
+  /* 사용자가 보낸 연령대/닉네임도 로컬에 기록 */
+  var _origMe = window.me;
+  window.me = function(t){
+    if(!S.age && typeof detectAge === 'function'){ var a = detectAge(t); if(a) S.age = a; }
+    else if(S.age && !S.nick && !(typeof detectActivity === 'function' && detectActivity(t)) && !/^\d+$/.test((t||'').trim())){
+      S.nick = (t||'').trim().replace(/님$|이에요$|예요$|입니다$/,'');
+    }
+    return _origMe(t);
+  };
+
+  /* ---------- 시작 ---------- */
+  window.greet = function(){
+    setAgentName('사회성 향상 게임 에이전트');
+    /* [FIX] file:// 는 고유 origin이라 fetch/iframe이 전부 차단됩니다. */
+    if (location.protocol === 'file:') {
+      var w = document.createElement('div');
+      w.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:99999;background:#b3261e;' +
+        'color:#fff;padding:10px 14px;font:14px/1.5 system-ui,sans-serif;text-align:center;';
+      w.innerHTML = '\u26a0\ufe0f <b>file:// \ub85c \uc5f4\uba74 \uc5d0\uc774\uc804\ud2b8\uc5d0 ' +
+        '\uc5f0\uacb0\ud560 \uc218 \uc5c6\uc2b5\ub2c8\ub2e4.</b> ' +
+        '\ud3f4\ub354\uc5d0\uc11c <code>python -m http.server 8000</code> \uc2e4\ud589 \ud6c4 ' +
+        '<b>http://localhost:8000/</b> \ub85c \uc811\uc18d\ud558\uc138\uc694.';
+      document.body.appendChild(w);
+      if (window.console) console.error('[agent] file:// detected - open via http://localhost');
+    }
+    setBadge('⏳ 에이전트 연결 중…', 'wait');
+    typingOn();
+    parentConn.connect().then(function(){
+      setBadge('🟢 부모 + 자식 4개 연결됨', 'live');
+      setTimeout(function(){ badge.style.display = 'none'; }, 2500);
+    }).catch(function(e){
+      enterHybrid(e.message);
+    });
+  };
+  window.reply = function(){};
+  window.pickFromCard = function(name){
+    openChat();
+    setTimeout(function(){ window.handle(name); }, 400);
+  };
+
+  window.__agentDebug = {
+    conns: CONNS, conn: conn, tokenUrl: tokenUrl, embedUrl: embedUrl,
+    goChild: goChild, returnToParent: returnToParent,
+    state: function(){ return { active: ACTIVE, pending: pending, nick: S.nick, age: S.age, tokens: S.tokens }; },
+    showFor: showFor, buildQuick: buildQuick, tidy: tidy
+  };
+
+  /* =====================================================================
+     대체 모드 (CORS 차단 시)
+     - 부모 역할(연령대/닉네임/토큰/추천)은 이 페이지가 직접 처리
+     - 실제 퀴즈/미션은 자식 에이전트 창을 띄워 진짜 에이전트가 진행
+     ===================================================================== */
+  function childFrameEl(){
+    var el = document.getElementById('childFrame');
+    if(el) return el;
+    el = document.createElement('div');
+    el.id = 'childFrame';
+    el.style.cssText = 'flex:1;display:none;';
+    el.innerHTML = '<iframe id="childIfr" style="width:100%;height:100%;border:0;" allow="microphone; clipboard-write"></iframe>';
+    var chat = document.querySelector('.chat');
+    if(chat) chat.appendChild(el);
+    return el;
+  }
+
+  function openChildFrame(act, count){
+    var schema = CFG.schemas[act];
+    if(!schema) return false;
+    var el = childFrameEl();
+    var ifr = document.getElementById('childIfr');
+    if(ifr) ifr.src = embedUrl(schema);
+    el.style.display = 'block';
+    ['body','quick'].forEach(function(id){ var e=document.getElementById(id); if(e) e.style.display='none'; });
+    var form = document.querySelector('.chat-input'); if(form) form.style.display = 'none';
+    setAgentName(act + ' 에이전트');
+    backBtn.classList.add('on');
+    ACTIVE = act;
+    return true;
+  }
+
+  function closeChildFrame(){
+    var el = document.getElementById('childFrame');
+    if(el) el.style.display = 'none';
+    var ifr = document.getElementById('childIfr'); if(ifr) ifr.src = 'about:blank';
+    ['body','quick'].forEach(function(id){ var e=document.getElementById(id); if(e) e.style.display=''; });
+    var form = document.querySelector('.chat-input'); if(form) form.style.display = '';
+    backBtn.classList.remove('on');
+    var prev = ACTIVE; ACTIVE = '부모';
+    setAgentName('사회성 향상 게임 에이전트');
+    bot((S.nick ? S.nick + '님!\n' : '') + (prev !== '부모' ? prev + ' 활동이 종료되었습니다.\n' : '') +
+        '현재 남은 토큰은 ' + S.tokens + '토큰입니다.\n다른 활동을 선택하시겠어요?', false);
+    if(S.tokens > 0) quick(RECO[S.age] || ['나라퀴즈','사물퀴즈','직업체험','실제미션']);
+    else quick([]);
+  }
+
+  function enterHybrid(reason){
+    if(HYBRID) return;
+    HYBRID = true;
+    typingOff();
+    setBadge('🟡 자식 에이전트 직접 연결 모드', 'wait');
+    setTimeout(function(){ badge.style.display = 'none'; }, 3000);
+    if(window.console) console.warn('[agent] Direct Line 차단 → 대체 모드로 전환:', reason);
+
+    // 로컬 부모 로직 복원
+    window.handle = ORIG.handle;
+    window.reply  = ORIG.reply;
+
+    // 퀴즈/미션은 로컬 시뮬레이션 대신 진짜 자식 에이전트 창으로
+    window.startActivity = function(act, count){
+      var cost = (COST[act] || 10) * count;
+      var before = S.tokens;
+      S.tokens -= cost;
+      var bar = document.getElementById('tokenBar');
+      if(bar) bar.textContent = '🪙 보유 토큰: ' + S.tokens;
+      var unit = (act === '직업체험') ? '개 직업' : (act === '실제미션' ? '개' : '문제');
+      bot(S.nick + '님!\n' + act + ' ' + count + unit + '를 시작할게요.\n' + cost +
+          '토큰이 차감됩니다.\n\n현재 토큰: ' + before + '\n차감 토큰: ' + cost +
+          '\n남은 토큰: ' + S.tokens, false);
+      S.step = 'menu';
+      setTimeout(function(){
+        sys('🔗 ' + (AGENT_EMO[act]||'') + ' ' + act + ' 에이전트에 연결했어요!');
+        bot('아래 창에서 ' + act + ' 에이전트와 바로 대화하세요 😊\n' +
+            '"' + (S.nick||'친구') + ', ' + (S.age||'') + ', ' + count + unit + ' 시작해주세요" 라고 입력하면 돼요.\n' +
+            '끝나면 위의 ↩︎ 돌아가기 를 눌러주세요.', false);
+        setTimeout(function(){ openChildFrame(act, count); }, 900);
+      }, 600);
+    };
+
+    // 카드 클릭도 로컬 흐름으로
+    window.pickFromCard = function(name){
+      openChat();
+      if(!S.nick || !S.age){
+        setTimeout(function(){ bot('먼저 연령대와 닉네임을 알려주시면 ' + name + '를 바로 시작할게요! 😊'); }, 400);
+        return;
+      }
+      setTimeout(function(){ window.handle(name); }, 300);
+    };
+
+    // 로컬 인사로 다시 시작
+    document.getElementById('body').innerHTML = '';
+    S.step = 'age'; S.run = null;
+    ORIG.greet();
+  }
+
+  /* 돌아가기 버튼: 모드에 따라 동작 분기 */
+  backBtn.onclick = function(){
+    if(HYBRID) closeChildFrame();
+    else returnToParent(true);
+  };
+
+  window.__agentHybrid = { enter: enterHybrid, openChildFrame: openChildFrame,
+                           closeChildFrame: closeChildFrame, isHybrid: function(){ return HYBRID; } };
+
+  setBadge('🔗 연결 준비됨');
 })();
 </script>
-<!-- =================== /실제 에이전트 연결 레이어 v2 =================== -->
+<!-- =================== /부모 + 자식 직접 연결 레이어 v3 =================== -->
 
 </body>
 </html>
